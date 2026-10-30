@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Analizador de incidentes SOC</title>
+<style>
+:root{--bg:#f2f5f8;--card:#fff;--ink:#16212c;--mut:#576574;--line:#d8e0e8;--ac:#1d5d8a;--c:#b3261e;--a:#cf5f0a;--m:#9a7300;--b:#2d7753;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10171e;--card:#18222c;--ink:#e6edf3;--mut:#9aa8b6;--line:#2b3947;--ac:#6fb3e0;--c:#ff7b72;--a:#f0883e;--m:#e3b341;--b:#56d364;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10171e;--card:#18222c;--ink:#e6edf3;--mut:#9aa8b6;--line:#2b3947;--ac:#6fb3e0;--c:#ff7b72;--a:#f0883e;--m:#e3b341;--b:#56d364;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:1.6rem;margin:0 0 4px;letter-spacing:-.01em}h2{font-size:1.15rem;margin:30px 0 12px}h3{font-size:1rem;margin:0}
+.sub{color:var(--mut);margin:0 0 18px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button,.btn{font:inherit;border:1px solid var(--ac);background:var(--ac);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer}
+:root:not([data-theme="light"]) button,:root:not([data-theme="light"]) .btn{color:#0b1218}
+button.sec{background:transparent;color:var(--ac)}button:disabled{opacity:.5;cursor:default}
+button:focus-visible,summary:focus-visible,input:focus-visible+.btn{outline:3px solid var(--ac);outline-offset:2px}
+input[type=file]{position:absolute;opacity:0;width:1px;height:1px}
+.empty{border:2px dashed var(--line);border-radius:12px;padding:40px 20px;text-align:center;color:var(--mut)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}.kpi b{display:block;font-size:1.7rem}.kpi span{color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:12px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.box canvas{max-height:230px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{background:#fff;color:#16212c;border-color:var(--line);padding:5px 12px;border-radius:99px}
+.chip[aria-pressed=true]{background:#fff;color:#16212c;border:2px solid var(--ac);padding:4px 11px;font-weight:600}
+.inc{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--k);border-radius:10px;padding:14px;margin-bottom:12px}
+.inc.c{--k:var(--c)}.inc.a{--k:var(--a)}.inc.m{--k:var(--m)}.inc.b{--k:var(--b)}
+.head{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start}
+.badge{font-weight:600;color:var(--k);border:1px solid var(--k);border-radius:99px;padding:1px 10px;white-space:nowrap}
+.meta{color:var(--mut);font-size:.88rem;margin:4px 0 8px}
+.f{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.sc{color:var(--mut);font-size:.85rem}
+details{margin-top:6px}summary{cursor:pointer;color:var(--ac)}
+.tw{overflow-x:auto;margin-top:6px}table{border-collapse:collapse;width:100%;font-size:.82rem}
+th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top}td.d{min-width:260px;word-break:break-word}
+.plan{font-size:.9rem;color:var(--mut);margin:8px 0 0;padding-left:18px}
+#rep{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;max-width:820px}
+#rep h4{margin:18px 0 4px;font-size:1.05rem}#rep h5{margin:12px 0 2px;font-size:.95rem}#rep p{margin:4px 0}#rep li{margin:2px 0}
+#rep .mono{font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--mut)}
+.note{color:var(--mut);font-size:.88rem;margin-top:8px}
+</style></head>
+<body><main>
+<h1>Analizador de incidentes SOC</h1>
+<p class="sub">Carga el Excel exportado del SIEM. Las detecciones salen de reglas sobre los registros; la IA solo redacta a partir de ellas.</p>
+<div class="bar">
+  <label style="position:relative"><input type="file" id="file" accept=".xlsx"><span class="btn" id="pick" tabindex="-1">Cargar archivo .xlsx</span></label>
+  <span id="fname" class="sc"></span>
+</div>
+<div id="empty" class="empty" style="margin-top:16px">Aún no hay datos. Carga el archivo .xlsx del SIEM para analizarlo.</div>
+<div id="app" hidden>
+  <h2>Panel</h2>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid">
+    <div class="box"><h3>Incidentes por criticidad</h3><canvas id="c1"></canvas></div>
+    <div class="box"><h3>Hallazgos por categoría</h3><canvas id="c2"></canvas></div>
+    <div class="box" style="grid-column:1/-1"><h3>Eventos de hallazgos por intervalo de 15 min</h3><canvas id="c3"></canvas></div>
+  </div>
+  <h2>Incidentes y clasificación de riesgo</h2>
+  <div class="chips" id="chips"></div>
+  <div id="incs"></div>
+  <h2>Informe técnico</h2>
+  <div class="bar"><button id="ia">Redactar con IA</button><button id="pdf">Exportar PDF</button><span id="msg" class="sc" role="status"></span></div>
+  <p class="note">Sin IA, el informe usa texto generado a partir de las reglas. Con IA, se reescribe el resumen ejecutivo, el impacto y las recomendaciones usando solo los hallazgos y sus evidencias.</p>
+  <div id="rep" style="margin-top:12px"></div>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),p2=n=>String(n).padStart(2,'0');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const isInt=ip=>/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip);
+const nh=h=>String(h||'').trim().toUpperCase().replace(/^([A-Z]+)-?(\d+)$/,'$1-$2');
+const fmt=t=>`${t.getFullYear()}-${p2(t.getMonth()+1)}-${p2(t.getDate())} ${p2(t.getHours())}:${p2(t.getMinutes())}:${p2(t.getSeconds())}`;
+const hm=t=>`${p2(t.getHours())}:${p2(t.getMinutes())}`;
+const by=(a,k)=>a.reduce((m,r)=>((m[k(r)]??=[]).push(r),m),{});
+const uniq=a=>[...new Set(a)];
+const LV=[['Crítico','c',85],['Alto','a',65],['Medio','m',40],['Bajo','b',0]];
+const lvl=s=>LV.find(l=>s>=l[2]);
+const PLAN={
+'Fuerza bruta':['Revisar 4624/4625 de la IP y cuentas afectadas; validar si hubo accesos exitosos.','Bloquear la IP en el perímetro; restablecer credenciales de cuentas con acceso exitoso.','Aplicar MFA, bloqueo por intentos y restringir RDP/DC desde Internet.'],
+'Escalamiento':['Identificar quién y desde dónde obtuvo privilegios (4672) y qué hizo después.','Revocar privilegios y sesiones de la cuenta.','Aplicar mínimo privilegio y auditar grupos administrativos.'],
+'Comandos':['Obtener el proceso padre, la línea de comandos completa y el host afectado.','Aislar el equipo; terminar procesos sospechosos.','Restaurar desde copia limpia si hubo borrado de copias de sombra; habilitar bloqueo de PowerShell codificado.'],
+'Persistencia':['Inspeccionar la tarea programada, el servicio y el binario indicados; calcular hash.','Deshabilitar la tarea y el servicio; aislar el servidor.','Eliminar artefactos, rotar credenciales de la cuenta y monitorear 4698/7045.'],
+'Movimiento lateral':['Mapear sesiones tipo 3/10 entre hosts y los recursos compartidos tocados.','Aislar origen y destino; cerrar sesiones activas.','Segmentar la red y restringir SMB/RDP entre servidores.'],
+'Exfiltración':['Cuantificar bytes y destinos; identificar qué archivos se comprimieron.','Bloquear el destino en proxy/firewall; aislar el equipo origen.','Evaluar notificación por fuga de datos y reforzar DLP.'],
+'Ataque web':['Revisar el log IIS completo de la IP y buscar archivos en /uploads.','Bloquear la IP; deshabilitar rutas expuestas.','Parchear la aplicación, aplicar WAF y revisar permisos de la cuenta del pool.']};
+const IMP={'Fuerza bruta':'Posible toma de cuentas del dominio.','Escalamiento':'Control con privilegios elevados sobre sistemas.','Comandos':'Ejecución de código y posible daño a la recuperación.','Persistencia':'Acceso sostenido del atacante tras reiniciar o remediar.','Movimiento lateral':'Propagación hacia servidores con datos sensibles.','Exfiltración':'Fuga de información confidencial.','Ataque web':'Compromiso del servidor web y pivote a la red interna.'};
+let R=[],F=[],I=[],AI=null,CH={},filt='Todos',nm='';
+const toDate=v=>v instanceof Date?v:new Date(String(v).replace(' ','T'));
+$('#file').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;nm=f.name;$('#fname').textContent=nm;
+ try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+ const need=['Log_ID','Timestamp','Hostname','Event_ID','User','Source_IP'];if(!rows.length||need.some(k=>!(k in rows[0]))){$('#fname').textContent='Faltan columnas esperadas: '+need.join(', ');return}
+ R=rows.map(r=>({id:r.Log_ID,t:toDate(r.Timestamp),host:nh(r.Hostname),ev:String(r.Event_ID),user:String(r.User||''),ip:String(r.Source_IP||''),dst:String(r.Destination||''),desc:String(r.Event_Description||''),cmd:String(r.Process_CommandLine||''),res:String(r.Result||''),sev:String(r.Severity||'')})).filter(r=>!isNaN(r.t)).sort((a,b)=>a.t-b.t);
+ AI=null;analyze();render()}catch(err){$('#fname').textContent='No se pudo leer el archivo: '+err.message}});
+
+function analyze(){F=[];
+ const add=f=>{f.rows=uniq(f.rows).sort((a,b)=>a.t-b.t);f.start=f.rows[0].t;f.end=f.rows.at(-1).t;f.host=uniq(f.rows.map(r=>r.host)).join(', ');F.push(f)};
+ const rng=f=>`${hm(f.rows[0].t)} y ${hm(f.rows.at(-1).t)}`;
+ // 1. Fuerza bruta / spraying desde IP externa
+ for(const [ip,rs] of Object.entries(by(R.filter(r=>r.ev==='4625'&&!isInt(r.ip)),r=>r.ip))){if(rs.length<3)continue;
+  const us=uniq(rs.map(r=>r.user)),ok=R.filter(r=>r.ev==='4624'&&r.ip===ip&&r.t>=rs[0].t),ou=uniq(ok.map(r=>r.user));
+  const f={cat:'Fuerza bruta',title:(us.length>=3?'Password spraying':'Fuerza bruta')+' desde '+ip,score:ok.length?70:40,actors:[ip,...ou],rows:[...rs,...ok]};
+  f.why=`${rs.length} fallos de inicio de sesión (4625) desde la IP externa ${ip} contra ${us.length} cuenta(s) entre ${hm(rs[0].t)} y ${hm(rs.at(-1).t)}`+(ok.length?`; después hubo ${ok.length} inicio(s) exitoso(s) (4624) de ${ou.join(', ')} desde la misma IP`:'; sin inicios exitosos posteriores en el log')+'.';add(f)}
+ // 2. Escalamiento con origen externo
+ for(const rs of Object.values(by(R.filter(r=>r.ev==='4672'&&!isInt(r.ip)),r=>r.ip+'|'+r.user)))
+  add({cat:'Escalamiento',title:`Privilegios especiales para ${rs[0].user} desde IP externa`,score:55,actors:[rs[0].ip,rs[0].user],rows:rs,why:`${rs.length} evento(s) 4672 (privilegios especiales) para ${rs[0].user} con origen externo ${rs[0].ip} en ${rs[0].host}.`});
+ // 3. Comandos y procesos
+ const PAT=[[/EncodedCommand/i,'PowerShell codificado',65],[/vssadmin(\.exe)?\s+delete\s+shadows/i,'Eliminación de copias de sombra',85],[/\b(7z|tar|rar)(\.exe)?\s+(a|-a|-c)\b/i,'Compresión de datos (staging)',60],[/\bnet(\.exe)?\s+(view|user|group)|whoami|Get-LocalGroupMember|Get-SmbShare/i,'Reconocimiento del sistema',40]];
+ const cr=R.filter(r=>['4688','4104'].includes(r.ev)),g={};
+ cr.forEach(r=>{const tx=r.cmd+' '+r.desc;PAT.forEach(([re,l,s])=>{if(re.test(tx))(g[l+'|'+r.user]??={l,s,rows:[]}).rows.push(r)})});
+ Object.values(g).forEach(x=>add({cat:'Comandos',title:`${x.l} por ${x.rows[0].user}`,score:x.s,actors:[x.rows[0].user,...(isInt(x.rows[0].ip)?[]:[x.rows[0].ip])],rows:x.rows,why:`${x.rows.length} evento(s) en ${uniq(x.rows.map(r=>r.host)).join(', ')} entre ${rng({rows:x.rows})}; comando: ${x.rows[0].cmd.slice(0,110)||x.rows[0].desc.slice(0,110)}.`}));
+ // 4. Persistencia
+ for(const rs of Object.values(by(R.filter(r=>['4698','7045'].includes(r.ev)),r=>r.user))){
+  const paths=rs.map(r=>(/ImagePath=([^\s;]+)/.exec(r.cmd+' '+r.desc)||[])[1]).filter(Boolean).map(x=>x.toLowerCase());
+  const ex=R.filter(r=>r.ev==='4688'&&paths.includes(r.cmd.trim().toLowerCase()));
+  add({cat:'Persistencia',title:`Persistencia creada por ${rs[0].user} en ${rs[0].host}`,score:75,actors:[rs[0].user],rows:[...rs,...ex],why:`Se registraron ${rs.map(r=>r.ev==='4698'?'una tarea programada (4698)':'un servicio instalado (7045)').join(' y ')} por ${rs[0].user}; el binario ${paths[0]||'indicado'} se ejecutó ${ex.length} vez/veces después.`})}
+ // 5. Movimiento lateral
+ for(const rs of Object.values(by(R.filter(r=>['4624','4625'].includes(r.ev)&&/source=([\w-]+)/i.test(r.desc)),r=>r.user))){
+  const sh=R.filter(r=>['5140','5145'].includes(r.ev)&&r.user===rs[0].user&&r.t>=rs[0].t&&/\\|Finance|Legal/i.test(r.dst+r.desc)&&r.sev!=='Informational');
+  add({cat:'Movimiento lateral',title:`Movimiento lateral de ${rs[0].user} desde ${(/source=([\w-]+)/i.exec(rs[0].desc))[1]}`,score:65+(sh.length?5:0),actors:[rs[0].user],rows:[...rs,...sh],why:`${rs[0].user} inició sesión de red (tipo 3) en ${rs[0].host} originada en ${(/source=([\w-]+)/i.exec(rs[0].desc))[1]}`+(sh.length?` y luego accedió a recursos compartidos: ${uniq(sh.map(r=>r.desc.replace(/^.*?:\s*/,'')||r.dst)).join(', ')}`:'')+'.'})}
+ // 6. Exfiltración
+ for(const rs of Object.values(by(R.filter(r=>r.ev==='PROXY_ACCESS'),r=>r.user+'|'+r.dst))){
+  const mb=rs.reduce((s,r)=>s+(+(/bytes_out=(\d+)/.exec(r.cmd)||[0,0])[1]),0)/1048576;if(rs.length<5&&mb<50)continue;
+  const pre=R.filter(r=>r.user===rs[0].user&&['5140','5145'].includes(r.ev)&&r.t<rs[0].t&&rs[0].t-r.t<9e5);
+  add({cat:'Exfiltración',title:`Salida de datos de ${rs[0].user} hacia ${rs[0].dst}`,score:85,actors:[rs[0].user],rows:[...pre,...rs],why:`${rs.length} solicitudes POST salientes a ${rs[0].dst} desde ${rs[0].host} entre ${rng({rows:rs})}, con unos ${mb.toFixed(0)} MB enviados en total (campo bytes_out).`})}
+ R.filter(r=>r.ev==='5156'&&/\d+\.\d+\.\d+\.\d+/.test(r.dst)&&!isInt(r.dst)&&/process=/i.test(r.desc)).forEach(r=>add({cat:'Exfiltración',title:`Conexión saliente a ${r.dst} desde ${r.host}`,score:70,actors:[r.user],rows:[r],why:`${r.host} permitió una conexión saliente a ${r.dst} (${r.desc.replace(/^.*\(/,'').replace(/\)$/,'')}) a las ${hm(r.t)}.`}));
+ // 7. Ataque web
+ for(const [ip,rs] of Object.entries(by(R.filter(r=>r.ev==='HTTP_ACCESS'&&!isInt(r.ip)),r=>r.ip))){if(rs.length<10)continue;
+  const er=rs.filter(r=>/^[45]/.test(r.res)).length,ex=R.filter(r=>r.ev==='4688'&&r.ip===ip&&/APPPOOL/i.test(r.user)),sh=rs.some(r=>/cmd=|\.aspx/i.test(r.cmd));
+  add({cat:'Ataque web',title:`Actividad web hostil desde ${ip} contra ${rs[0].host}`,score:ex.length?75:50,actors:[ip],rows:[...rs,...ex],why:`${rs.length} peticiones HTTP desde ${ip} en ${rng({rows:rs})}, ${er} con error 4xx/5xx${sh?', incluyendo rutas con parámetro cmd= o .aspx':''}`+(ex.length?`; después el pool de IIS ejecutó un proceso: ${ex[0].cmd}`:'')+'.'})}
+ // Correlación: unión por actores (IP externa o usuario)
+ const par={},fd=x=>par[x]===x||par[x]===undefined?(par[x]=x):(par[x]=fd(par[x]));
+ F.forEach(f=>{f.actors=uniq(f.actors);f.actors.forEach(a=>fd(a));f.actors.slice(1).forEach(a=>par[fd(a)]=fd(f.actors[0]))});
+ I=Object.values(by(F,f=>fd(f.actors[0]))).map(fs=>{const cats=uniq(fs.map(f=>f.cat)),top=fs.reduce((a,b)=>b.score>a.score?b:a);
+  const score=Math.min(100,top.score+5*(cats.length-1));return{fs:fs.sort((a,b)=>a.start-b.start),cats,top,score,level:lvl(score),start:fs.reduce((m,f)=>f.start<m?f.start:m,fs[0].start),end:fs.reduce((m,f)=>f.end>m?f.end:m,fs[0].end),actors:uniq(fs.flatMap(f=>f.actors))}}).sort((a,b)=>b.score-a.score).map((i,n)=>(i.id='INC-'+(n+1),i));
+ F.forEach(f=>f.level=lvl(f.score))}
+
+const just=i=>`Puntaje ${i.score}/100: base ${i.top.score} por "${i.top.title}"`+(i.cats.length>1?` más 5 por cada categoría adicional correlacionada (${i.cats.length-1}: ${i.cats.join(', ')})`:'')+`. Umbrales: Crítico 85 o más, Alto 65, Medio 40.`;
+function evTable(rows){const s=rows.slice(0,40);return `<div class="tw"><table><tr><th>Log_ID</th><th>Hora</th><th>Host</th><th>Usuario</th><th>IP</th><th>Detalle</th></tr>${s.map(r=>`<tr><td>${esc(r.id)}</td><td>${hm(r.t)}</td><td>${esc(r.host)}</td><td>${esc(r.user)}</td><td>${esc(r.ip)}</td><td class="d">${esc(r.cmd||r.desc)}</td></tr>`).join('')}</table></div>${rows.length>40?`<p class="sc">Se muestran 40 de ${rows.length} eventos.</p>`:''}`}
+function render(){$('#app').hidden=false;$('#empty').hidden=true;
+ const cnt=l=>I.filter(i=>i.level[0]===l).length;
+ $('#kpis').innerHTML=[['Eventos analizados',R.length],['Hallazgos',F.length],['Incidentes',I.length],['Críticos',cnt('Crítico')],['Altos',cnt('Alto')]].map(([a,b])=>`<div class="kpi"><b>${b}</b><span>${a}</span></div>`).join('');
+ const cs=getComputedStyle(document.documentElement),col=k=>cs.getPropertyValue('--'+k).trim();Chart.defaults.color=col('mut');Chart.defaults.borderColor=col('line');
+ Object.values(CH).forEach(c=>c.destroy());
+ CH.a=new Chart($('#c1'),{type:'doughnut',data:{labels:LV.map(l=>l[0]),datasets:[{data:LV.map(l=>cnt(l[0])),backgroundColor:LV.map(l=>col(l[1])),borderWidth:0}]},options:{plugins:{legend:{position:'bottom'}}}});
+ const cc=by(F,f=>f.cat);CH.b=new Chart($('#c2'),{type:'bar',data:{labels:Object.keys(cc),datasets:[{data:Object.values(cc).map(a=>a.length),backgroundColor:col('ac')}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{precision:0}}}}});
+ const ids=new Map();F.forEach(f=>f.rows.forEach(r=>ids.set(r.id,r)));const bk={};ids.forEach(r=>{const k=hm(new Date(Math.floor(r.t/9e5)*9e5));bk[k]=(bk[k]||0)+1});
+ const ks=Object.keys(bk).sort();CH.c=new Chart($('#c3'),{type:'bar',data:{labels:ks,datasets:[{data:ks.map(k=>bk[k]),backgroundColor:col('a')}]},options:{plugins:{legend:{display:false}},scales:{y:{ticks:{precision:0}}}}});
+ $('#chips').innerHTML=['Todos',...LV.map(l=>l[0])].map(n=>`<button class="chip" aria-pressed="${filt===n}" data-f="${n}">${n}${n==='Todos'?'':' ('+cnt(n)+')'}</button>`).join('');
+ $('#chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{filt=b.dataset.f;render()});
+ $('#incs').innerHTML=I.filter(i=>filt==='Todos'||i.level[0]===filt).map(i=>`<article class="inc ${i.level[1]}"><div class="head"><div><h3>${i.id}: ${esc(i.top.title)}</h3><div class="meta">${fmt(i.start)} a ${hm(i.end)} | ${i.fs.length} hallazgo(s) | ${esc(i.cats.join(', '))}</div></div><span class="badge">${i.level[0]} ${i.score}</span></div>
+ <p class="sc">${esc(just(i))}</p>${i.fs.map(f=>`<div class="f"><b>${esc(f.title)}</b> <span class="sc">(${f.cat}, ${f.level[0]} ${f.score}, ${f.rows.length} eventos)</span><p style="margin:4px 0">${esc(f.why)}</p><details><summary>Ver evidencias</summary>${evTable(f.rows)}</details></div>`).join('')}
+ <ul class="plan">${plan(i).map(x=>`<li><b>${x[0]}:</b> ${esc(x[1])}</li>`).join('')}</ul></article>`).join('')||'<p class="sc">No hay incidentes en este nivel.</p>';
+ rep()}
+const plan=i=>['Investigar','Contener','Remediar'].map((l,n)=>[l,i.cats.map(c=>PLAN[c][n]).join(' ')]);
+function blocks(){const b=[],sp=[...R.map(r=>r.t)];const a=R[0].t,z=R.at(-1).t,cn=l=>I.filter(i=>i.level[0]===l).length;
+ b.push(['h1','Informe técnico de incidentes de seguridad'],['m',`Fuente: ${nm} | Periodo: ${fmt(a)} a ${fmt(z)} | ${R.length} eventos`]);
+ b.push(['h2','1. Resumen ejecutivo'],['p',AI?.resumen||`Se analizaron ${R.length} eventos y se identificaron ${F.length} hallazgos agrupados en ${I.length} incidente(s): ${cn('Crítico')} crítico(s), ${cn('Alto')} alto(s), ${cn('Medio')} medio(s) y ${cn('Bajo')} bajo(s). ${I.map(i=>`${i.id} (${i.level[0]}): ${i.top.title}.`).join(' ')} Las conclusiones se limitan a lo que muestran los registros.`]);
+ b.push(['h2','2. Hallazgos, evidencias, criticidad e impacto']);
+ I.forEach(i=>{b.push(['h3',`${i.id} - ${i.top.title} [${i.level[0]}, ${i.score}/100]`],['m',`Ventana: ${fmt(i.start)} a ${hm(i.end)} | Entidades: ${i.actors.join(', ')}`]);
+  i.fs.forEach(f=>{b.push(['p',`Hallazgo: ${f.title} (${f.cat}).`],['p',`Explicación técnica: ${f.why}`]);
+   f.rows.slice(0,10).forEach(r=>b.push(['m',`${r.id} ${fmt(r.t)} ${r.host} ${r.user} ${r.ip} ${(r.cmd||r.desc).slice(0,90)}`]));if(f.rows.length>10)b.push(['m',`... y ${f.rows.length-10} evento(s) más.`])});
+  b.push(['p','Criticidad y justificación: '+just(i)],['p','Posible impacto: '+(AI?.impactos?.[i.id]||i.cats.map(c=>IMP[c]).join(' '))]);
+  plan(i).forEach(x=>b.push(['p',`${x[0]}: ${x[1]}`]))});
+ b.push(['h2','3. Recomendaciones generales'],...(AI?.recomendaciones||['Aplicar MFA en cuentas administrativas y de servicio.','Bloquear RDP y acceso a controladores de dominio desde Internet.','Segmentar la red entre servidores y estaciones.','Monitorear PowerShell codificado, vssadmin, creación de servicios y tareas programadas.','Registrar y alertar volumen saliente anómalo en el proxy.','Revisar la severidad asignada por el SIEM: varios eventos maliciosos figuran como Informational.']).map(x=>['p','- '+x]));
+ return b}
+function rep(){$('#rep').innerHTML=blocks().map(([t,s])=>({h1:`<h2 style="margin-top:0">${esc(s)}</h2>`,h2:`<h4>${esc(s)}</h4>`,h3:`<h5>${esc(s)}</h5>`,p:`<p>${esc(s)}</p>`,m:`<p class="mono">${esc(s)}</p>`})[t]).join('')}
+$('#ia').onclick=async()=>{const s=window.claude?.use?await claude.use('sample'):null;if(!s){$('#msg').textContent='La IA no está disponible en esta vista; se mantiene el texto generado por reglas.';return}
+ const data=I.map(i=>({id:i.id,nivel:i.level[0],puntaje:i.score,categorias:i.cats,hallazgos:i.fs.map(f=>({titulo:f.title,hecho:f.why,evidencias:f.rows.slice(0,5).map(r=>`${r.id} ${fmt(r.t)} ${r.host} ${r.user} ${(r.cmd||r.desc).slice(0,80)}`)}))}));
+ $('#ia').disabled=true;$('#msg').textContent='Redactando...';
+ try{AI=await s.json(`Eres analista SOC nivel 2. Redacta en español, tono técnico, SOLO con los datos dados; no inventes IPs, usuarios, archivos ni impactos que los datos no respalden y di cuando algo no se puede confirmar. Datos: ${JSON.stringify(data)}. Responde únicamente JSON con esta forma: {"resumen":"2 a 4 frases","impactos":{"INC-1":"1 a 2 frases"},"recomendaciones":["5 a 7 recomendaciones breves"]}. Incluye una clave por cada id de incidente.`);rep();$('#msg').textContent='Informe redactado con IA.'}
+ catch(e){AI=null;$('#msg').textContent='No se pudo usar la IA ('+(e.code||e.message)+'); se mantiene el texto por reglas.'}$('#ia').disabled=false};
+$('#pdf').onclick=async()=>{const {jsPDF}=window.jspdf,d=new jsPDF({unit:'mm',format:'a4'});let y=18;const S={h1:[16,'bold'],h2:[13,'bold'],h3:[11,'bold'],p:[10,'normal'],m:[8,'normal']};
+ blocks().forEach(([t,s])=>{const [z,w]=S[t];d.setFont(t==='m'?'courier':'helvetica',w);d.setFontSize(z);const ls=d.splitTextToSize(s,180),h=ls.length*z*.42+(t[0]==='h'?3:1.5);if(y+h>284){d.addPage();y=18}if(t==='h2')y+=3;d.text(ls,15,y);y+=h});
+ const dl=window.claude?.use?await claude.use('downloads'):null,buf=d.output('arraybuffer');
+ if(dl){try{await dl.save({filename:'Informe_SOC.pdf',data:buf});$('#msg').textContent='PDF listo.'}catch(e){$('#msg').textContent=e.code==='declined'?'Descarga cancelada.':'No se pudo guardar el PDF ('+(e.code||e.message)+').'}}else d.save('Informe_SOC.pdf')};
+</script></body></html>
